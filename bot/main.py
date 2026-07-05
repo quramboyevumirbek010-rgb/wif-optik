@@ -1,6 +1,8 @@
 import os
 import logging
 import threading
+import time
+import urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, ConversationHandler
@@ -17,6 +19,7 @@ ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "YOUR_ADMIN_CHAT_ID")
 
 # Web server - Render uchun (port ochiq bo'lishi kerak)
 PORT = int(os.environ.get("PORT", 10000))
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://wif-optik.onrender.com")
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -30,6 +33,16 @@ class HealthHandler(BaseHTTPRequestHandler):
 def run_web_server():
     server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
     server.serve_forever()
+
+def keep_alive():
+    """Har 10 daqiqada o'ziga ping yuboradi — bot uxlamasligi uchun"""
+    while True:
+        time.sleep(600)  # 10 daqiqa
+        try:
+            urllib.request.urlopen(RENDER_URL)
+            logger.info("Keep-alive ping yuborildi")
+        except Exception as e:
+            logger.error(f"Keep-alive xato: {e}")
 
 
 # Conversation states
@@ -386,6 +399,11 @@ def main():
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
     logger.info(f"Web server {PORT} portda ishga tushdi")
+    
+    # Keep-alive — bot uxlamasligi uchun
+    alive_thread = threading.Thread(target=keep_alive, daemon=True)
+    alive_thread.start()
+    logger.info("Keep-alive ishga tushdi — bot 24/7 ishlaydi")
     
     app = Application.builder().token(BOT_TOKEN).build()
     
