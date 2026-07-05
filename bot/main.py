@@ -1,5 +1,7 @@
 import os
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
@@ -12,6 +14,23 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 
 # Admin chat ID - buyurtmalar shu yerga keladi
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "YOUR_ADMIN_CHAT_ID")
+
+# Web server - Render uchun (port ochiq bo'lishi kerak)
+PORT = int(os.environ.get("PORT", 10000))
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"WiF Optik Bot is running!")
+    def log_message(self, format, *args):
+        pass
+
+def run_web_server():
+    server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
+    server.serve_forever()
+
 
 # Conversation states
 ORDER_NAME, ORDER_PHONE, ORDER_ADDRESS, ORDER_SERVICE = range(4)
@@ -363,6 +382,11 @@ Yoki tez orada operator javob beradi! ⏰
 
 def main():
     """Botni ishga tushirish"""
+    # Web server ishga tushirish (Render uchun)
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+    logger.info(f"Web server {PORT} portda ishga tushdi")
+    
     app = Application.builder().token(BOT_TOKEN).build()
     
     # Buyurtma conversation handler
